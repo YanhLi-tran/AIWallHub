@@ -3,6 +3,7 @@ package handler
 import (
 	"AIWallHub/config"
 	"AIWallHub/internal/model"
+	"AIWallHub/pkg/crypto"
 	"net/http"
 	"regexp"
 	"unicode/utf8"
@@ -13,14 +14,21 @@ import (
 // 注册接口(用邮箱方式)
 func Register(c *gin.Context) {
 	var json struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Username        string `json:"username"`
+		Password        string `json:"password"`
+		ConfirmPassword string `json:"confirm_password"`
+		Email           string `json:"email"`
 	}
 	if err := c.ShouldBindJSON(&json); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "参数格式错误",
 		})
+		return
+	}
+
+	// 校验两次密码是否一致
+	if json.Password != json.ConfirmPassword {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "两次输入的密码不一致"})
 		return
 	}
 
@@ -73,14 +81,21 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	//加密密码
+	hashedPassword, err := crypto.HashPassword(json.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+		return
+	}
+
 	//创建新用户
 	user := model.User{
 		Name:     json.Username,
 		Email:    json.Email,
-		Password: json.Password,
+		Password: hashedPassword,
 	}
 	if err := config.DB.Create(&user).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "注册失败",
 		})
 		return
@@ -112,17 +127,16 @@ func Login(c *gin.Context) {
 
 	//登录信息检查
 	var user model.User
-	if err := config.DB.Where("email=? AND password=?", json.Email, json.Password).First(&user).Error; err != nil {
+	if err := config.DB.Where("email=?", json.Email).First(&user).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "邮箱或密码错误",
 		})
 		return
 	}
 
-	if user.Password != json.Password {
+	if !crypto.CheckPassword(json.Password, user.Password) {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "邮箱或密码错误",
-		})
+			"error": "邮箱或密码错误"})
 		return
 	}
 
