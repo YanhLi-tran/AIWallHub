@@ -10,6 +10,7 @@ import (
 )
 
 var DB *gorm.DB
+var JWTSecret []byte
 
 func InitDB() {
 	if err := godotenv.Load(); err != nil {
@@ -46,4 +47,12 @@ func InitDB() {
 		log.Fatal("数据库连接失败:", err)
 	}
 	log.Println("数据库连接成功")
+
+	// 读取 JWT 密钥
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "your-secret-key-change-this"
+	}
+	JWTSecret = []byte(jwtSecret)
+
 }

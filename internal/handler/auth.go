@@ -4,6 +4,7 @@ import (
 	"AIWallHub/config"
 	"AIWallHub/internal/model"
 	"AIWallHub/pkg/crypto"
+	"AIWallHub/pkg/jwt"
 	"net/http"
 	"regexp"
 	"unicode/utf8"
@@ -140,9 +141,17 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// 生成 JWT token
+	token, err := jwt.GenerateToken(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成令牌失败"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "登陆成功",
 		"user_id":  user.ID,
 		"username": user.Name,
+		"token":    token,
 	})
 }
