@@ -2,14 +2,14 @@
 package main
 
 import (
-	"AIWallHub/handlers"
+	handler "AIWallHub/internal/handler"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	r := gin.Default()
-	r.POST("/register", handlers.Register)
-	r.POST("/login", handlers.Login)
+	r.POST("/register", handler.Register)
+	r.POST("/login", handler.Login)
 	r.Run(":8080")
 }
