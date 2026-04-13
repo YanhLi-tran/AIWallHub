@@ -34,14 +34,14 @@ func Register(c *gin.Context) {
 
 	//校验用户名长度
 	usernamelen := utf8.RuneCountInString(json.Username)
-	if usernamelen < 3 {
+	if usernamelen < 1 {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "用户名需要3-20个字符,当前用户名过短",
+			"error": "用户名需要1-20个字符,当前用户名过短",
 		})
 		return
 	} else if usernamelen > 20 {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "用户名需要3-20个字符,当前用户名过长",
+			"error": "用户名需要1-20个字符,当前用户名过长",
 		})
 		return
 	}
