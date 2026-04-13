@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"AIWallHub/config"
 	"AIWallHub/internal/model"
 	"net/http"
 	"regexp"
@@ -64,7 +65,8 @@ func Register(c *gin.Context) {
 	}
 
 	//检查邮箱是否已被注册
-	if _, exists := model.UserByEmail[json.Email]; exists {
+	var existingUser model.User
+	if err := config.DB.Where("email=?", json.Email).First(&existingUser).Error; err == nil {
 		c.JSON(http.StatusConflict, gin.H{
 			"error": "该邮箱已被注册",
 		})
@@ -73,18 +75,19 @@ func Register(c *gin.Context) {
 
 	//创建新用户
 	user := model.User{
-		ID:       model.NextID,
 		Name:     json.Username,
 		Email:    json.Email,
 		Password: json.Password,
 	}
-
-	model.Users[user.ID] = user
-	model.UserByEmail[user.Email] = user
-	model.NextID++
+	if err := config.DB.Create(&user).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "注册失败",
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "您已成功注册，请记好密码",
+		"message": "注册成功",
 		"user_id": user.ID,
 	})
 
@@ -108,8 +111,15 @@ func Login(c *gin.Context) {
 	}
 
 	//登录信息检查
-	user, exists := model.UserByEmail[json.Email]
-	if !exists || user.Password != json.Password {
+	var user model.User
+	if err := config.DB.Where("email=? AND password=?", json.Email, json.Password).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "邮箱或密码错误",
+		})
+		return
+	}
+
+	if user.Password != json.Password {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "邮箱或密码错误",
 		})

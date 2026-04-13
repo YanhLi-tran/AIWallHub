@@ -1,15 +1,20 @@
 package model
 
+import "time"
+
 type User struct {
-	ID       int    `json:"id"`
-	Name     string `json:"name"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	Name      string    `json:"name" gorm:"size:100;not null"`
+	Email     string    `json:"email" gorm:"uniqueIndex;size:100;not null"`
+	Password  string    `json:"-" gorm:"size:255;not null"`
+	Avatar    string    `json:"avatar,omitempty" gorm:"size:500;default:''"`
+	Bio       string    `json:"bio" gorm:"size:200;default:'用户还没有在此留下足迹哦~'"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// 后续续改为数据库存储用户信息，当前为内存存储
-var (
-	Users       = make(map[int]User)    //用ID存储用户信息
-	UserByEmail = make(map[string]User) //用Email存储用户信息
-	NextID      = 1                     //下一个用户的ID
-)
+//用户数据存储
+
+func (User) TableName() string {
+	return "user"
+}
