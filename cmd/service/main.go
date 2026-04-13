@@ -3,7 +3,7 @@ package main
 
 import (
 	"AIWallHub/config"
-	handler "AIWallHub/internal/handler"
+	"AIWallHub/internal/handler"
 
 	"github.com/gin-gonic/gin"
 )
