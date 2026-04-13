@@ -51,7 +51,7 @@ func GetUser(c *gin.Context) {
 // 获取用户列表（分页）
 func GetUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", 10))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 
 	if page < 1 {
 		page = 1
