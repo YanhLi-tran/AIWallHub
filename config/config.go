@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
@@ -13,19 +14,20 @@ import (
 var DB *gorm.DB
 var JWTSecret []byte
 
-// LoadEnv加载.env文件
+// LoadEnv 加载 .env 文件（从项目根目录）
 func LoadEnv() {
-	// 获取当前可执行文件所在目录
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Println("获取当前目录失败:", err)
+	// 获取当前文件路径
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		log.Println("获取当前文件路径失败")
 		return
 	}
 
-	// 向上查找包含go.mod的目录（项目根目录）
+	// 向上查找项目根目录（包含 go.mod 的目录）
+	dir := filepath.Dir(filename) // config 目录
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			break //找到项目根目录
+			break // 找到项目根目录
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -35,7 +37,7 @@ func LoadEnv() {
 		dir = parent
 	}
 
-	// 加载.env文件
+	// 加载 .env 文件
 	envPath := filepath.Join(dir, ".env")
 	if err := godotenv.Load(envPath); err != nil {
 		log.Printf("未找到 .env 文件 (%s)，使用默认配置", envPath)
