@@ -3,8 +3,9 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  cmd = "go build -o ./tmp/main ./cmd/service/main.go"
-  bin = "./tmp/main"
+  cmd = "go build -o ./tmp/main.exe ./cmd/service/main.go"
+  bin = "./tmp/main.exe"
+  cwd = "."
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "testdata"]
   exclude_file = []
