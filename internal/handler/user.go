@@ -3,12 +3,55 @@ package handler
 import (
 	"AIWallHub/config"
 	"AIWallHub/internal/model"
+	"AIWallHub/pkg/cache"
 	"AIWallHub/pkg/crypto"
+	"AIWallHub/pkg/email"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
+
+// SendVerifyCode 发送邮箱验证码
+func SendVerifyCode(c *gin.Context) {
+	var json struct {
+		Email string `json:"email"`
+	}
+	if err := c.ShouldBindJSON(&json); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "参数格式错误",
+		})
+		return
+	}
+
+	// 校验邮箱格式
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	if !emailRegex.MatchString(json.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "邮箱格式不正确",
+		})
+		return
+	}
+
+	// 生成验证码
+	code := email.GenerateCode()
+
+	// 存储验证码
+	cache.Set(json.Email, code)
+
+	// 发送邮件
+	if err := email.SendVerificationCode(json.Email, code); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "发送验证码失败" + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "验证码已发送",
+	})
+}
 
 // 获取单个用户信息
 func GetUser(c *gin.Context) {
@@ -227,9 +270,17 @@ func UpdateEmail(c *gin.Context) {
 	var json struct {
 		Password string `json:"password"`
 		NewEmail string `json:"new_email"`
+		Code     string `json:"code"`
 	}
 	if err := c.ShouldBindJSON(&json); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数格式错误"})
+		return
+	}
+
+	// 验证验证码
+	savedCode, ok := cache.Get(json.NewEmail)
+	if !ok || savedCode != json.Code {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "验证码错误或已过期"})
 		return
 	}
 
@@ -258,6 +309,9 @@ func UpdateEmail(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "修改邮箱失败"})
 		return
 	}
+
+	//删除验证码
+	cache.Delete(json.NewEmail)
 
 	c.JSON(http.StatusOK, gin.H{"message": "邮箱修改成功"})
 }

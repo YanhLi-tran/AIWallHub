@@ -3,6 +3,7 @@ package handler
 import (
 	"AIWallHub/config"
 	"AIWallHub/internal/model"
+	"AIWallHub/pkg/cache"
 	"AIWallHub/pkg/crypto"
 	"AIWallHub/pkg/jwt"
 	"net/http"
@@ -19,6 +20,7 @@ func Register(c *gin.Context) {
 		Password        string `json:"password"`
 		ConfirmPassword string `json:"confirm_password"`
 		Email           string `json:"email"`
+		Code            string `json:"code"`
 	}
 	if err := c.ShouldBindJSON(&json); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -73,6 +75,13 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	// 验证验证码
+	savedCode, ok := cache.Get(json.Email)
+	if !ok || savedCode != json.Code {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "验证码错误或已过期"})
+		return
+	}
+
 	//检查邮箱是否已被注册
 	var existingUser model.User
 	if err := config.DB.Where("email=?", json.Email).First(&existingUser).Error; err == nil {
@@ -101,6 +110,9 @@ func Register(c *gin.Context) {
 		})
 		return
 	}
+
+	// 删除验证码
+	cache.Delete(json.Email)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "注册成功",

@@ -5,6 +5,7 @@ import (
 	"AIWallHub/config"
 	"AIWallHub/internal/handler"
 	"AIWallHub/internal/middleware"
+	"AIWallHub/pkg/email"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,12 +13,22 @@ import (
 func main() {
 	config.LoadEnv()
 	config.InitDB()
+	config.LoadSMTPConfig()
+
+	// 初始化邮件服务
+	email.InitEmail(email.Config{
+		Host:     config.SMTPConfig.Host,
+		Port:     config.SMTPConfig.Port,
+		Username: config.SMTPConfig.Username,
+		Password: config.SMTPConfig.Password,
+	})
 
 	r := gin.Default()
 
 	//公开路由，不需要登录
 	r.POST("/register", handler.Register)
 	r.POST("/login", handler.Login)
+	r.POST("/send-code", handler.SendVerifyCode)
 
 	//需要登录的路由组
 	authorized := r.Group("/")

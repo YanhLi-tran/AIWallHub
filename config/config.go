@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
@@ -86,4 +87,23 @@ func InitDB() {
 	}
 	JWTSecret = []byte(jwtSecret)
 
+}
+
+// 添加邮件配置结构
+var SMTPConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+}
+
+func LoadSMTPConfig() {
+	SMTPConfig.Host = os.Getenv("SMTP_HOST")
+	SMTPConfig.Port, _ = strconv.Atoi(os.Getenv("SMTP_PORT"))
+	SMTPConfig.Username = os.Getenv("SMTP_USER")
+	SMTPConfig.Password = os.Getenv("SMTP_PASSWORD")
+
+	log.Println("SMTP Host:", SMTPConfig.Host)
+	log.Println("SMTP Port:", SMTPConfig.Port)
+	log.Println("SMTP User:", SMTPConfig.Username)
 }
