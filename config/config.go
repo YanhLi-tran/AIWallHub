@@ -1,6 +1,7 @@
 package config
 
 import (
+	"AIWallHub/internal/model"
 	"log"
 	"os"
 	"path/filepath"
@@ -79,6 +80,16 @@ func InitDB() {
 		log.Fatal("数据库连接失败:", err)
 	}
 	log.Println("数据库连接成功")
+
+	//自动迁移数据库
+	err = DB.AutoMigrate(
+		&model.User{},
+		&model.Post{},
+	)
+	if err != nil {
+		log.Fatal("迁移数据库失败:", err)
+	}
+	log.Println("数据库表迁移成功")
 
 	// 读取 JWT 密钥
 	jwtSecret := os.Getenv("JWT_SECRET")
