@@ -301,3 +301,135 @@ func GetUserPosts(c *gin.Context) {
 		"list":      result,
 	})
 }
+
+// LokePost 点赞动态
+func LikePost(c *gin.Context) {
+	rawUserID, exists := c.Get("current_user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "请先登录",
+		})
+		return
+	}
+	userID, ok := rawUserID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "用户ID类型错误",
+		})
+		return
+	}
+
+	//获取动态ID
+	postID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "无效的动态ID",
+		})
+		return
+	}
+
+	//检查动态是否存在
+	var post model.Post
+	if err := config.DB.First(&post, postID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "动态不存在",
+		})
+		return
+	}
+
+	//检查是否已点赞
+	var existingLike model.Like
+	if err := config.DB.Where("user_id=? AND post_id=?", userID, postID).First(&existingLike).Error; err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "已经点过赞了",
+		})
+		return
+	}
+
+	// 创建点赞记录
+	like := model.Like{
+		UserID: userID,
+		PostID: uint(postID),
+	}
+	result := config.DB.Create(&like)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "点赞失败",
+		})
+		return
+	}
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "点赞失败，未插入记录",
+		})
+		return
+	}
+
+	//更新动态的点赞数
+	config.DB.Model(&post).Update("likes", post.Likes+1)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "点赞成功",
+	})
+}
+
+// UnlikePost 取消点赞动态
+func UnlikePost(c *gin.Context) {
+	// 获取当前用户ID
+	rawUserID, exists := c.Get("current_user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "请先登录",
+		})
+		return
+	}
+	userID, ok := rawUserID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "用户ID类型错误",
+		})
+		return
+	}
+
+	// 获取动态ID
+	postID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "无效的动态ID",
+		})
+		return
+	}
+
+	// 查找点赞记录
+	var like model.Like
+	if err := config.DB.Where("user_id = ? AND post_id = ?", userID, postID).First(&like).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "还没有点过赞",
+		})
+		return
+	}
+
+	// 删除点赞记录
+	result := config.DB.Delete(&like)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "取消点赞失败",
+		})
+		return
+	}
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "点赞记录不存在",
+		})
+		return
+	}
+
+	// 更新动态的点赞数
+	var post model.Post
+	config.DB.First(&post, postID)
+	config.DB.Model(&post).Update("likes", post.Likes-1)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "取消点赞成功",
+	})
+}

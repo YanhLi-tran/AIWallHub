@@ -85,6 +85,7 @@ func InitDB() {
 	err = DB.AutoMigrate(
 		&model.User{},
 		&model.Post{},
+		&model.Like{},
 	)
 	if err != nil {
 		log.Fatal("迁移数据库失败:", err)

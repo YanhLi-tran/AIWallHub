@@ -49,6 +49,8 @@ func main() {
 		authorized.POST("/post", handler.CreatePost)
 		authorized.DELETE("/post/:id", handler.DeletePost)
 		authorized.GET("/user/:id/posts", handler.GetUserPosts)
+		authorized.POST("/post/:id/like", handler.LikePost)
+		authorized.DELETE("/post/:id/like", handler.UnlikePost)
 	}
 
 	r.Run(":8080")
