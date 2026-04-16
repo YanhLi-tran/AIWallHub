@@ -12,6 +12,7 @@ type Post struct {
 	MediaURL  string    `gorm:"size:500" json:"media_url"` // 图片地址
 	Views     int       `gorm:"default:0" json:"views"`    // 浏览次数
 	Likes     int       `gorm:"default:0" json:"likes"`    // 点赞数
+	Comments  int       `gorm:"default:0" json:"comments_count"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

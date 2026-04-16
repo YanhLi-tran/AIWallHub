@@ -162,12 +162,13 @@ func GetPosts(c *gin.Context) {
 				"id":   user.ID,
 				"name": user.Name,
 			},
-			"type":       post.Type,
-			"content":    post.Content,
-			"media_url":  post.MediaURL,
-			"likes":      post.Likes,
-			"views":      post.Views,
-			"created_at": post.CreatedAt,
+			"type":           post.Type,
+			"content":        post.Content,
+			"media_url":      post.MediaURL,
+			"likes":          post.Likes,
+			"comments_count": post.Comments,
+			"views":          post.Views,
+			"created_at":     post.CreatedAt,
 		})
 	}
 
@@ -204,12 +205,13 @@ func GetPost(c *gin.Context) {
 			"id":   user.ID,
 			"name": user.Name,
 		},
-		"type":       post.Type,
-		"content":    post.Content,
-		"media_url":  post.MediaURL,
-		"likes":      post.Likes,
-		"views":      post.Views + 1,
-		"created_at": post.CreatedAt,
+		"type":           post.Type,
+		"content":        post.Content,
+		"media_url":      post.MediaURL,
+		"likes":          post.Likes,
+		"comments_count": post.Comments,
+		"views":          post.Views + 1,
+		"created_at":     post.CreatedAt,
 	})
 }
 

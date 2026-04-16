@@ -32,6 +32,7 @@ func main() {
 	r.POST("/send-code", handler.SendVerifyCode)
 	r.GET("/posts", handler.GetPosts)
 	r.GET("/post/:id", handler.GetPost)
+	r.GET("/post/:id/comments", handler.GetComments)
 
 	//需要登录的路由组
 	authorized := r.Group("/")
@@ -51,6 +52,8 @@ func main() {
 		authorized.GET("/user/:id/posts", handler.GetUserPosts)
 		authorized.POST("/post/:id/like", handler.LikePost)
 		authorized.DELETE("/post/:id/like", handler.UnlikePost)
+		authorized.POST("/post/:id/comment", handler.CreateComment)
+		authorized.DELETE("/comment/:id", handler.DeleteComment)
 	}
 
 	r.Run(":8080")
