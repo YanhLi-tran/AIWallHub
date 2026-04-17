@@ -33,6 +33,7 @@ func main() {
 	r.GET("/posts", handler.GetPosts)
 	r.GET("/post/:id", handler.GetPost)
 	r.GET("/post/:id/comments", handler.GetComments)
+	r.GET("/post/:id/likes", handler.GetPostLikes)
 
 	//需要登录的路由组
 	authorized := r.Group("/")
@@ -54,6 +55,10 @@ func main() {
 		authorized.DELETE("/post/:id/like", handler.UnlikePost)
 		authorized.POST("/post/:id/comment", handler.CreateComment)
 		authorized.DELETE("/comment/:id", handler.DeleteComment)
+		authorized.POST("/post/:id/favorite", handler.FavoritePost)
+		authorized.DELETE("/post/:id/favorite", handler.UnfavoritePost)
+		authorized.GET("/user/:id/favorites", handler.GetFavorites)
+		authorized.GET("/user/:id/likes", handler.GetUserLikes)
 	}
 
 	r.Run(":8080")

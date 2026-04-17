@@ -435,3 +435,118 @@ func UnlikePost(c *gin.Context) {
 		"message": "取消点赞成功",
 	})
 }
+
+// GetPostLikes 获取动态的点赞用户列表（由动态作者决定是否显示）
+func GetPostLikes(c *gin.Context) {
+	postID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "无效的动态ID",
+		})
+		return
+	}
+
+	var post model.Post
+	if err := config.DB.First(&post, postID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "动态不存在",
+		})
+		return
+	}
+
+	// 由动态作者决定是否显示点赞用户列表
+	if !post.ShowLikes {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "作者未公开点赞列表",
+		})
+		return
+	}
+
+	var likes []model.Like
+	config.DB.Where("post_id = ?", postID).Find(&likes)
+
+	var result []gin.H
+	for _, like := range likes {
+		var user model.User
+		config.DB.First(&user, like.UserID)
+
+		// 点赞用户自己的隐私设置：是否显示他的点赞记录（可选）
+		// 这里可以根据需要决定是否加这层过滤
+		result = append(result, gin.H{
+			"user_id":  user.ID,
+			"username": user.Name,
+			"liked_at": like.CreatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total": len(result),
+		"list":  result,
+	})
+}
+
+// GetUserLikes 获取用户的点赞列表（由用户自己决定是否公开）
+func GetUserLikes(c *gin.Context) {
+	// 获取当前用户
+	rawUserID, exists := c.Get("current_user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "请先登录",
+		})
+		return
+	}
+	currentUserID, ok := rawUserID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "用户ID类型错误",
+		})
+		return
+	}
+
+	// 获取要查看的用户ID
+	targetUserID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "无效的用户ID",
+		})
+		return
+	}
+
+	// 获取用户信息
+	var user model.User
+	if err := config.DB.First(&user, targetUserID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "用户不存在",
+		})
+		return
+	}
+
+	// 由用户自己决定是否公开点赞列表
+	if currentUserID != uint(targetUserID) && !user.LikesVisible {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "该用户未公开点赞列表",
+		})
+		return
+	}
+
+	// 查询点赞记录
+	var likes []model.Like
+	config.DB.Where("user_id = ?", targetUserID).Order("created_at DESC").Find(&likes)
+
+	var result []gin.H
+	for _, like := range likes {
+		var post model.Post
+		config.DB.First(&post, like.PostID)
+		result = append(result, gin.H{
+			"post_id":   post.ID,
+			"content":   post.Content,
+			"media_url": post.MediaURL,
+			"liked_at":  like.CreatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total": len(result),
+		"list":  result,
+	})
+}

@@ -15,4 +15,6 @@ type Post struct {
 	Comments  int       `gorm:"default:0" json:"comments_count"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	Favorites int       `gorm:"default:0" json:"favorites_count"`
+	ShowLikes bool      `gorm:"default:true" json:"show_likes"` // 是否显示点赞用户列表
 }

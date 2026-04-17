@@ -87,6 +87,7 @@ func InitDB() {
 		&model.Post{},
 		&model.Like{},
 		&model.Comment{},
+		&model.Favorite{},
 	)
 	if err != nil {
 		log.Fatal("迁移数据库失败:", err)

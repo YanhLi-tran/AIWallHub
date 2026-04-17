@@ -166,10 +166,12 @@ func UpdateUser(c *gin.Context) {
 	}
 
 	var json struct {
-		Name         string `json:"name"`
-		Avatar       string `json:"avatar"`
-		Bio          string `json:"bio"`
-		EmailVisible bool   `json:"email_visible"`
+		Name             string `json:"name"`
+		Avatar           string `json:"avatar"`
+		Bio              string `json:"bio"`
+		EmailVisible     bool   `json:"email_visible"`
+		LikesVisible     bool   `json:"likes_visible"`
+		FavoritesVisible bool   `json:"favorites_visible"`
 	}
 	if err := c.ShouldBindJSON(&json); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -180,10 +182,12 @@ func UpdateUser(c *gin.Context) {
 
 	//构建更新数据
 	updates := map[string]interface{}{
-		"name":          json.Name,
-		"avatar":        json.Avatar,
-		"bio":           json.Bio,
-		"email_visible": json.EmailVisible,
+		"name":              json.Name,
+		"avatar":            json.Avatar,
+		"bio":               json.Bio,
+		"email_visible":     json.EmailVisible,
+		"likes_visible":     json.LikesVisible,
+		"favorites_visible": json.FavoritesVisible,
 	}
 
 	result := config.DB.Model(&model.User{}).Where("id=?", id).Updates(updates)
