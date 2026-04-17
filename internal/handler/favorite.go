@@ -184,3 +184,58 @@ func GetFavorites(c *gin.Context) {
 		"list":  result,
 	})
 }
+
+// GetPostFavorites 获取动态的收藏用户列表（由动态作者决定是否显示）
+func GetPostFavorites(c *gin.Context) {
+	postID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "无效的动态ID",
+		})
+		return
+	}
+
+	var post model.Post
+	if err := config.DB.First(&post, postID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "动态不存在",
+		})
+		return
+	}
+
+	// 获取当前用户
+	rawUserID, exists := c.Get("current_user_id")
+	var currentUserID uint
+	if exists {
+		if uid, ok := rawUserID.(uint); ok {
+			currentUserID = uid
+		}
+	}
+
+	// 作者自己永远可见，其他人需要检查作者设置
+	if currentUserID != post.UserID && !post.ShowFavorites {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "作者未公开收藏列表",
+		})
+		return
+	}
+
+	var favorites []model.Favorite
+	config.DB.Where("post_id = ?", postID).Find(&favorites)
+
+	var result []gin.H
+	for _, fav := range favorites {
+		var user model.User
+		config.DB.First(&user, fav.UserID)
+		result = append(result, gin.H{
+			"user_id":      user.ID,
+			"username":     user.Name,
+			"collected_at": fav.CreatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total": len(result),
+		"list":  result,
+	})
+}

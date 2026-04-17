@@ -4,6 +4,7 @@ import (
 	"AIWallHub/config"
 	"AIWallHub/internal/model"
 	"AIWallHub/pkg/validator"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -438,6 +439,11 @@ func UnlikePost(c *gin.Context) {
 
 // GetPostLikes 获取动态的点赞用户列表（由动态作者决定是否显示）
 func GetPostLikes(c *gin.Context) {
+	// 调试日志
+	rawUserID, exists := c.Get("current_user_id")
+	fmt.Println("=== 调试信息 ===")
+	fmt.Println("exists:", exists)
+	fmt.Println("rawUserID:", rawUserID)
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -454,8 +460,17 @@ func GetPostLikes(c *gin.Context) {
 		return
 	}
 
-	// 由动态作者决定是否显示点赞用户列表
-	if !post.ShowLikes {
+	// 获取当前用户
+	// rawUserID, exists = c.Get("current_user_id")
+	var currentUserID uint
+	if exists {
+		if uid, ok := rawUserID.(uint); ok {
+			currentUserID = uid
+		}
+	}
+
+	// 作者自己永远可见，其他人需要检查作者设置
+	if currentUserID != post.UserID && !post.ShowLikes {
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "作者未公开点赞列表",
 		})
@@ -548,5 +563,71 @@ func GetUserLikes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"total": len(result),
 		"list":  result,
+	})
+}
+
+// UpdatePost 更新动态（让作者设置是否公开点赞/收藏列表）
+func UpdatePost(c *gin.Context) {
+	// 获取当前用户
+	rawUserID, exists := c.Get("current_user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "请先登录",
+		})
+		return
+	}
+	userID, ok := rawUserID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "用户ID类型错误",
+		})
+		return
+	}
+
+	// 获取动态ID
+	postID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "无效的动态ID",
+		})
+		return
+	}
+
+	// 查询动态
+	var post model.Post
+	if err := config.DB.First(&post, postID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "动态不存在",
+		})
+		return
+	}
+
+	// 只能修改自己的动态
+	if post.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "无权修改他人的动态",
+		})
+		return
+	}
+
+	var json struct {
+		ShowLikes     bool `json:"show_likes"`
+		ShowFavorites bool `json:"show_favorites"`
+	}
+	if err := c.ShouldBindJSON(&json); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "参数格式错误",
+		})
+		return
+	}
+
+	// 更新
+	config.DB.Model(&post).Updates(map[string]interface{}{
+		"show_likes":     json.ShowLikes,
+		"show_favorites": json.ShowFavorites,
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "更新成功",
 	})
 }
