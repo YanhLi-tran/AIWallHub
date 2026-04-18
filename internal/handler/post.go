@@ -4,7 +4,7 @@ import (
 	"AIWallHub/config"
 	"AIWallHub/internal/model"
 	"AIWallHub/pkg/validator"
-	"fmt"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,12 +33,11 @@ func CreatePost(c *gin.Context) {
 
 	postType := c.PostForm("type")
 	content := strings.TrimSpace(c.PostForm("content"))
-	file, fileErr := c.FormFile("media")
 
 	// 类型校验
-	if postType != "text" && postType != "image" {
+	if postType != "text" && postType != "image" && postType != "video" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "类型只能是 text 或 image",
+			"error": "类型只能是 text、image或 video",
 		})
 		return
 	}
@@ -80,47 +79,108 @@ func CreatePost(c *gin.Context) {
 		return
 	}
 
-	//图片类型处理
+	// 图片类型处理
 	if postType == "image" {
-		if fileErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "请上传图片",
-			})
+		// 获取多张图片
+		form, err := c.MultipartForm()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "请上传图片"})
 			return
 		}
 
-		ok, msg := validator.ValidateImage(file, "post_image")
-		if !ok {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": msg,
-			})
+		files := form.File["media[]"]
+		if len(files) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "请至少上传一张图片"})
 			return
 		}
 
-		timestamp := time.Now().Unix()
-		filename := strconv.Itoa(int(userID)) + "_" + strconv.FormatInt(timestamp, 10) + "_" + file.Filename
-		savePath := "./uploads/" + filename
-		if err := c.SaveUploadedFile(file, savePath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "保存图片失败",
-			})
+		if len(files) > 9 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "最多上传9张图片"})
 			return
 		}
-		mediaURL := "/uploads/" + filename
+
+		var mediaURLs []string
+		for _, file := range files {
+			ok, msg := validator.ValidateImage(file, "post_image")
+			if !ok {
+				c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+				return
+			}
+
+			timestamp := time.Now().UnixNano()
+			filename := strconv.Itoa(int(userID)) + "_" + strconv.FormatInt(timestamp, 10) + "_" + file.Filename
+			savePath := "./uploads/" + filename
+			if err := c.SaveUploadedFile(file, savePath); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "保存图片失败"})
+				return
+			}
+			mediaURLs = append(mediaURLs, "/uploads/"+filename)
+		}
+
+		mediaURLsJSON, _ := json.Marshal(mediaURLs)
 
 		post := model.Post{
 			UserID:    userID,
 			Type:      "image",
 			Content:   content,
-			MediaURL:  mediaURL,
+			MediaURLs: string(mediaURLsJSON),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
 
 		if err := config.DB.Create(&post).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "发布失败",
-			})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "发布失败"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "发布成功",
+			"post_id": post.ID,
+		})
+		return
+	}
+
+	// 视频类型处理
+	if postType == "video" {
+		file, err := c.FormFile("video")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "请上传视频"})
+			return
+		}
+
+		// 验证视频
+		ok, msg := validator.ValidateVideo(file, "post_video")
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+			return
+		}
+
+		// 获取视频时长（可选，需要 FFmpeg）
+		duration := 0
+		// 如果有 FFmpeg，可以解析时长
+
+		// 保存视频
+		timestamp := time.Now().UnixNano()
+		filename := strconv.Itoa(int(userID)) + "_" + strconv.FormatInt(timestamp, 10) + "_" + file.Filename
+		savePath := "./uploads/" + filename
+		if err := c.SaveUploadedFile(file, savePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "保存视频失败"})
+			return
+		}
+		videoURL := "/uploads/" + filename
+
+		post := model.Post{
+			UserID:        userID,
+			Type:          "video",
+			Content:       content,
+			VideoURL:      videoURL,
+			VideoDuration: duration,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+
+		if err := config.DB.Create(&post).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "发布失败"})
 			return
 		}
 
@@ -157,19 +217,29 @@ func GetPosts(c *gin.Context) {
 		var user model.User
 		config.DB.First(&user, post.UserID)
 
+		// 解析 media_urls
+		var mediaURLs []string
+		if post.MediaURLs != "" {
+			json.Unmarshal([]byte(post.MediaURLs), &mediaURLs)
+		}
+
 		result = append(result, gin.H{
 			"id": post.ID,
 			"user": gin.H{
 				"id":   user.ID,
 				"name": user.Name,
 			},
-			"type":           post.Type,
-			"content":        post.Content,
-			"media_url":      post.MediaURL,
-			"likes":          post.Likes,
-			"comments_count": post.Comments,
-			"views":          post.Views,
-			"created_at":     post.CreatedAt,
+			"type":            post.Type,
+			"content":         post.Content,
+			"media_url":       post.MediaURL,
+			"likes":           post.Likes,
+			"comments_count":  post.Comments,
+			"views":           post.Views,
+			"created_at":      post.CreatedAt,
+			"media_urls":      mediaURLs,
+			"video_url":       post.VideoURL,
+			"video_duration":  post.VideoDuration,
+			"video_thumbnail": post.VideoThumbnail,
 		})
 	}
 
@@ -185,13 +255,17 @@ func GetPosts(c *gin.Context) {
 func GetPost(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "无效的ID",
+		})
 		return
 	}
 
 	var post model.Post
 	if err := config.DB.First(&post, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "动态不存在"})
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "动态不存在",
+		})
 		return
 	}
 
@@ -200,19 +274,29 @@ func GetPost(c *gin.Context) {
 	var user model.User
 	config.DB.First(&user, post.UserID)
 
+	// 解析 media_urls
+	var mediaURLs []string
+	if post.MediaURLs != "" {
+		json.Unmarshal([]byte(post.MediaURLs), &mediaURLs)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"id": post.ID,
 		"user": gin.H{
 			"id":   user.ID,
 			"name": user.Name,
 		},
-		"type":           post.Type,
-		"content":        post.Content,
-		"media_url":      post.MediaURL,
-		"likes":          post.Likes,
-		"comments_count": post.Comments,
-		"views":          post.Views + 1,
-		"created_at":     post.CreatedAt,
+		"type":            post.Type,
+		"content":         post.Content,
+		"media_url":       post.MediaURL,
+		"media_urls":      mediaURLs,
+		"likes":           post.Likes,
+		"comments_count":  post.Comments,
+		"views":           post.Views + 1,
+		"created_at":      post.CreatedAt,
+		"video_url":       post.VideoURL,
+		"video_duration":  post.VideoDuration,
+		"video_thumbnail": post.VideoThumbnail,
 	})
 }
 
@@ -286,14 +370,24 @@ func GetUserPosts(c *gin.Context) {
 
 	var result []gin.H
 	for _, post := range posts {
+		// 解析 media_urls
+		var mediaURLs []string
+		if post.MediaURLs != "" {
+			json.Unmarshal([]byte(post.MediaURLs), &mediaURLs)
+		}
+
 		result = append(result, gin.H{
-			"id":         post.ID,
-			"type":       post.Type,
-			"content":    post.Content,
-			"media_url":  post.MediaURL,
-			"likes":      post.Likes,
-			"views":      post.Views,
-			"created_at": post.CreatedAt,
+			"id":              post.ID,
+			"type":            post.Type,
+			"content":         post.Content,
+			"media_url":       post.MediaURL,
+			"media_urls":      mediaURLs,
+			"likes":           post.Likes,
+			"views":           post.Views,
+			"created_at":      post.CreatedAt,
+			"video_url":       post.VideoURL,
+			"video_duration":  post.VideoDuration,
+			"video_thumbnail": post.VideoThumbnail,
 		})
 	}
 
@@ -302,267 +396,6 @@ func GetUserPosts(c *gin.Context) {
 		"page":      page,
 		"page_size": pageSize,
 		"list":      result,
-	})
-}
-
-// LokePost 点赞动态
-func LikePost(c *gin.Context) {
-	rawUserID, exists := c.Get("current_user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "请先登录",
-		})
-		return
-	}
-	userID, ok := rawUserID.(uint)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "用户ID类型错误",
-		})
-		return
-	}
-
-	//获取动态ID
-	postID, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "无效的动态ID",
-		})
-		return
-	}
-
-	//检查动态是否存在
-	var post model.Post
-	if err := config.DB.First(&post, postID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "动态不存在",
-		})
-		return
-	}
-
-	//检查是否已点赞
-	var existingLike model.Like
-	if err := config.DB.Where("user_id=? AND post_id=?", userID, postID).First(&existingLike).Error; err == nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "已经点过赞了",
-		})
-		return
-	}
-
-	// 创建点赞记录
-	like := model.Like{
-		UserID: userID,
-		PostID: uint(postID),
-	}
-	result := config.DB.Create(&like)
-	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "点赞失败",
-		})
-		return
-	}
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "点赞失败，未插入记录",
-		})
-		return
-	}
-
-	//更新动态的点赞数
-	config.DB.Model(&post).Update("likes", post.Likes+1)
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "点赞成功",
-	})
-}
-
-// UnlikePost 取消点赞动态
-func UnlikePost(c *gin.Context) {
-	// 获取当前用户ID
-	rawUserID, exists := c.Get("current_user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "请先登录",
-		})
-		return
-	}
-	userID, ok := rawUserID.(uint)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "用户ID类型错误",
-		})
-		return
-	}
-
-	// 获取动态ID
-	postID, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "无效的动态ID",
-		})
-		return
-	}
-
-	// 查找点赞记录
-	var like model.Like
-	if err := config.DB.Where("user_id = ? AND post_id = ?", userID, postID).First(&like).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "还没有点过赞",
-		})
-		return
-	}
-
-	// 删除点赞记录
-	result := config.DB.Delete(&like)
-	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "取消点赞失败",
-		})
-		return
-	}
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "点赞记录不存在",
-		})
-		return
-	}
-
-	// 更新动态的点赞数
-	var post model.Post
-	config.DB.First(&post, postID)
-	config.DB.Model(&post).Update("likes", post.Likes-1)
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "取消点赞成功",
-	})
-}
-
-// GetPostLikes 获取动态的点赞用户列表（由动态作者决定是否显示）
-func GetPostLikes(c *gin.Context) {
-	// 调试日志
-	rawUserID, exists := c.Get("current_user_id")
-	fmt.Println("=== 调试信息 ===")
-	fmt.Println("exists:", exists)
-	fmt.Println("rawUserID:", rawUserID)
-	postID, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "无效的动态ID",
-		})
-		return
-	}
-
-	var post model.Post
-	if err := config.DB.First(&post, postID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "动态不存在",
-		})
-		return
-	}
-
-	// 获取当前用户
-	// rawUserID, exists = c.Get("current_user_id")
-	var currentUserID uint
-	if exists {
-		if uid, ok := rawUserID.(uint); ok {
-			currentUserID = uid
-		}
-	}
-
-	// 作者自己永远可见，其他人需要检查作者设置
-	if currentUserID != post.UserID && !post.ShowLikes {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "作者未公开点赞列表",
-		})
-		return
-	}
-
-	var likes []model.Like
-	config.DB.Where("post_id = ?", postID).Find(&likes)
-
-	var result []gin.H
-	for _, like := range likes {
-		var user model.User
-		config.DB.First(&user, like.UserID)
-
-		// 点赞用户自己的隐私设置：是否显示他的点赞记录（可选）
-		// 这里可以根据需要决定是否加这层过滤
-		result = append(result, gin.H{
-			"user_id":  user.ID,
-			"username": user.Name,
-			"liked_at": like.CreatedAt,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"total": len(result),
-		"list":  result,
-	})
-}
-
-// GetUserLikes 获取用户的点赞列表（由用户自己决定是否公开）
-func GetUserLikes(c *gin.Context) {
-	// 获取当前用户
-	rawUserID, exists := c.Get("current_user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "请先登录",
-		})
-		return
-	}
-	currentUserID, ok := rawUserID.(uint)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "用户ID类型错误",
-		})
-		return
-	}
-
-	// 获取要查看的用户ID
-	targetUserID, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "无效的用户ID",
-		})
-		return
-	}
-
-	// 获取用户信息
-	var user model.User
-	if err := config.DB.First(&user, targetUserID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "用户不存在",
-		})
-		return
-	}
-
-	// 由用户自己决定是否公开点赞列表
-	if currentUserID != uint(targetUserID) && !user.LikesVisible {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "该用户未公开点赞列表",
-		})
-		return
-	}
-
-	// 查询点赞记录
-	var likes []model.Like
-	config.DB.Where("user_id = ?", targetUserID).Order("created_at DESC").Find(&likes)
-
-	var result []gin.H
-	for _, like := range likes {
-		var post model.Post
-		config.DB.First(&post, like.PostID)
-		result = append(result, gin.H{
-			"post_id":   post.ID,
-			"content":   post.Content,
-			"media_url": post.MediaURL,
-			"liked_at":  like.CreatedAt,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"total": len(result),
-		"list":  result,
 	})
 }
 

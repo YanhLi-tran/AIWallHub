@@ -66,3 +66,44 @@ func ValidateImage(file *multipart.FileHeader, scene string) (bool, string) {
 
 	return true, ""
 }
+
+// 视频场景限制
+var VideoLimits = map[string]struct {
+	MaxSize int64
+	Exts    map[string]bool
+}{
+	"post_video": {
+		MaxSize: 100 << 20, // 100 MB
+		Exts: map[string]bool{
+			".mp4":  true,
+			".mov":  true,
+			".avi":  true,
+			".mkv":  true,
+			".webm": true,
+		},
+	},
+}
+
+// ValidateVideo 验证视频
+func ValidateVideo(file *multipart.FileHeader, scene string) (bool, string) {
+	limit, ok := VideoLimits[scene]
+	if !ok {
+		return false, "无效的场景"
+	}
+
+	if file.Size > limit.MaxSize {
+		return false, "视频大小超过限制"
+	}
+
+	contentType := file.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "video/") {
+		return false, "只支持视频文件"
+	}
+
+	ext := strings.ToLower(file.Filename[strings.LastIndex(file.Filename, "."):])
+	if !limit.Exts[ext] {
+		return false, "不支持的视频格式"
+	}
+
+	return true, ""
+}

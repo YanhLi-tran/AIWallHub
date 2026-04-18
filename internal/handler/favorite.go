@@ -3,6 +3,7 @@ package handler
 import (
 	"AIWallHub/config"
 	"AIWallHub/internal/model"
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -171,11 +172,25 @@ func GetFavorites(c *gin.Context) {
 	for _, fav := range favorites {
 		var post model.Post
 		config.DB.First(&post, fav.PostID)
+
+		// 解析图片数组
+		var mediaURLs []string
+		if post.MediaURLs != "" {
+			json.Unmarshal([]byte(post.MediaURLs), &mediaURLs)
+		}
+
 		result = append(result, gin.H{
-			"post_id":    post.ID,
-			"content":    post.Content,
-			"media_url":  post.MediaURL,
-			"created_at": fav.CreatedAt,
+			"post_id":         post.ID,
+			"type":            post.Type,
+			"content":         post.Content,
+			"media_url":       post.MediaURL,
+			"media_urls":      mediaURLs,
+			"likes":           post.Likes,
+			"comments_count":  post.Comments,
+			"created_at":      fav.CreatedAt,
+			"video_url":       post.VideoURL,
+			"video_duration":  post.VideoDuration,
+			"video_thumbnail": post.VideoThumbnail,
 		})
 	}
 
