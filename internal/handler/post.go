@@ -5,7 +5,9 @@ import (
 	"AIWallHub/internal/model"
 	"AIWallHub/pkg/validator"
 	"encoding/json"
+	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -320,7 +322,9 @@ func DeletePost(c *gin.Context) {
 
 	userID, ok := rawUserID.(uint)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "用户ID类型错误"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "用户ID类型错误",
+		})
 		return
 	}
 
@@ -333,13 +337,40 @@ func DeletePost(c *gin.Context) {
 	}
 
 	if post.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "无权删除他人的动态"})
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "无权删除他人的动态",
+		})
 		return
+	}
+
+	// 删除关联的图片文件
+	if post.MediaURLs != "" {
+		var mediaURLs []string
+		json.Unmarshal([]byte(post.MediaURLs), &mediaURLs)
+		for _, url := range mediaURLs {
+			filename := strings.TrimPrefix(url, "/uploads/")
+			filePath := "./uploads/" + filename
+			if err := os.Remove(filePath); err != nil {
+				// 只记录日志，不返回错误（文件可能已被删除）
+				log.Printf("删除文件失败: %s, 错误: %v", filePath, err)
+			}
+		}
+	}
+
+	// 删除视频文件
+	if post.VideoURL != "" {
+		filename := strings.TrimPrefix(post.VideoURL, "/uploads/")
+		filePath := "./uploads/" + filename
+		if err := os.Remove(filePath); err != nil {
+			log.Printf("删除视频文件失败: %s, 错误: %v", filePath, err)
+		}
 	}
 
 	config.DB.Delete(&post)
 
-	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "删除成功",
+	})
 }
 
 // GetUserPosts获取某个用户的所有动态
