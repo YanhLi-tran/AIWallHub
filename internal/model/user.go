@@ -14,6 +14,7 @@ type User struct {
 	FavoritesVisible bool      `gorm:"default:false" json:"favorites_visible"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+	Status           int       `gorm:"default:1" json:"status"` // 1=正常, 0=已注销
 }
 
 //用户数据存储

@@ -147,16 +147,27 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// 检查用户是否已注销
+	if user.Status == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "账号已注销",
+		})
+		return
+	}
+
 	if !crypto.CheckPassword(json.Password, user.Password) {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "邮箱或密码错误"})
+			"error": "邮箱或密码错误",
+		})
 		return
 	}
 
 	// 生成 JWT token
 	token, err := jwt.GenerateToken(user.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成令牌失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "生成令牌失败",
+		})
 		return
 	}
 

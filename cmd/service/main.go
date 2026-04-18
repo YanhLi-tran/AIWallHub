@@ -39,12 +39,13 @@ func main() {
 	authorized.Use(middleware.AuthMiddleware())
 	{
 		//用户管理
-		authorized.GET("/user", handler.GetUsers)                //用户列表
-		authorized.GET("/user/:id", handler.GetUser)             //单个用户
-		authorized.PUT("/user/:id", handler.UpdateUser)          //更新用户
-		authorized.DELETE("/user/:id", handler.DeleteUser)       //删除用户
-		authorized.PUT("/user/password", handler.UpdatePassword) // 修改密码
-		authorized.PUT("/user/email", handler.UpdateEmail)       // 修改邮箱
+		authorized.GET("/user", handler.GetUsers)                 //用户列表
+		authorized.GET("/user/:id", handler.GetUser)              //单个用户
+		authorized.PUT("/user/:id", handler.UpdateUser)           //更新用户
+		authorized.DELETE("/user/:id", handler.DeleteUser)        //删除用户
+		authorized.PUT("/user/password", handler.UpdatePassword)  // 修改密码
+		authorized.PUT("/user/email", handler.UpdateEmail)        // 修改邮箱
+		authorized.DELETE("/user/account", handler.DeleteAccount) // 注销账号
 
 		//动态管理
 		authorized.POST("/post", handler.CreatePost)

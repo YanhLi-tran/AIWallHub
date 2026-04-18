@@ -6,9 +6,12 @@ import (
 	"AIWallHub/pkg/cache"
 	"AIWallHub/pkg/crypto"
 	"AIWallHub/pkg/email"
+	"encoding/json"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -379,4 +382,91 @@ func DeleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "成功删除",
 	})
+}
+
+// DeleteAccount 注销用户（永久删除）
+func DeleteAccount(c *gin.Context) {
+	// 获取当前用户
+	rawUserID, exists := c.Get("current_user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "请先登录",
+		})
+		return
+	}
+	userID, ok := rawUserID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "用户ID类型错误",
+		})
+		return
+	}
+
+	// 验证密码
+	var jsonData struct {
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&jsonData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "参数格式错误",
+		})
+		return
+	}
+
+	var user model.User
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "用户不存在",
+		})
+		return
+	}
+
+	if !crypto.CheckPassword(jsonData.Password, user.Password) {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "密码错误",
+		})
+		return
+	}
+
+	// 获取用户的所有动态
+	var posts []model.Post
+	config.DB.Where("user_id = ?", userID).Find(&posts)
+
+	// 删除动态关联的文件
+	for _, post := range posts {
+		// 删除图片文件
+		if post.MediaURLs != "" {
+			var mediaURLs []string
+			if err := json.Unmarshal([]byte(post.MediaURLs), &mediaURLs); err == nil {
+				for _, url := range mediaURLs {
+					filename := strings.TrimPrefix(url, "/uploads/")
+					filePath := "./uploads/" + filename
+					os.Remove(filePath)
+				}
+			}
+		}
+		// 删除视频文件
+		if post.VideoURL != "" {
+			filename := strings.TrimPrefix(post.VideoURL, "/uploads/")
+			filePath := "./uploads/" + filename
+			os.Remove(filePath)
+		}
+	}
+
+	// 删除用户的所有动态记录
+	config.DB.Where("user_id = ?", userID).Delete(&model.Post{})
+
+	// 删除用户的点赞记录
+	config.DB.Where("user_id = ?", userID).Delete(&model.Like{})
+
+	// 删除用户的收藏记录
+	config.DB.Where("user_id = ?", userID).Delete(&model.Favorite{})
+
+	// 删除用户的评论记录
+	config.DB.Where("user_id = ?", userID).Delete(&model.Comment{})
+
+	// 删除用户
+	config.DB.Delete(&user)
+
+	c.JSON(http.StatusOK, gin.H{"message": "账号已注销"})
 }
