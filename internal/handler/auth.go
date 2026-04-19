@@ -31,7 +31,9 @@ func Register(c *gin.Context) {
 
 	// 校验两次密码是否一致
 	if json.Password != json.ConfirmPassword {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "两次输入的密码不一致"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "两次输入的密码不一致",
+		})
 		return
 	}
 
@@ -74,13 +76,15 @@ func Register(c *gin.Context) {
 		})
 		return
 	}
-
-	// 验证验证码
-	savedCode, ok := cache.Get(json.Email)
-	if !ok || savedCode != json.Code {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "验证码错误或已过期"})
-		return
-	}
+	//临时注释
+	// // 验证验证码
+	// savedCode, ok := cache.Get(json.Email)
+	// if !ok || savedCode != json.Code {
+	// 	c.JSON(http.StatusBadRequest, gin.H{
+	// 		"error": "验证码错误或已过期",
+	// 	})
+	// 	return
+	// }
 
 	//检查邮箱是否已被注册
 	var existingUser model.User

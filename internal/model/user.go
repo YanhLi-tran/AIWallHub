@@ -15,6 +15,7 @@ type User struct {
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 	Status           int       `gorm:"default:1" json:"status"` // 1=正常, 0=已注销
+	FollowVisible    bool      `gorm:"default:true" json:"follow_visible"`
 }
 
 //用户数据存储

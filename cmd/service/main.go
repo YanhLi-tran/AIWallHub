@@ -62,6 +62,18 @@ func main() {
 		authorized.PUT("/post/:id", handler.UpdatePost)
 		authorized.GET("/post/:id/likes", handler.GetPostLikes)
 		authorized.GET("/post/:id/favorites", handler.GetPostFavorites)
+
+		// 关注/粉丝
+		authorized.POST("/user/:id/follow", handler.Follow)
+		authorized.DELETE("/user/:id/follow", handler.Unfollow)
+		authorized.GET("/user/:id/followers", handler.GetFollowers)
+		authorized.GET("/user/:id/following", handler.GetFollowings)
+		authorized.GET("/user/:id/mutual", handler.IsMutualFollow)
+
+		// 私信
+		authorized.POST("/user/:id/message", handler.SendMessage)
+		authorized.GET("/user/:id/messages", handler.GetMessages)
+		authorized.GET("/messages/conversations", handler.GetConversationList)
 	}
 
 	r.Run(":8080")
