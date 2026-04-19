@@ -175,6 +175,7 @@ func UpdateUser(c *gin.Context) {
 		EmailVisible     bool   `json:"email_visible"`
 		LikesVisible     bool   `json:"likes_visible"`
 		FavoritesVisible bool   `json:"favorites_visible"`
+		FollowVisible    bool   `json:"follow_visible"`
 	}
 	if err := c.ShouldBindJSON(&json); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -191,6 +192,7 @@ func UpdateUser(c *gin.Context) {
 		"email_visible":     json.EmailVisible,
 		"likes_visible":     json.LikesVisible,
 		"favorites_visible": json.FavoritesVisible,
+		"follow_visible":    json.FollowVisible,
 	}
 
 	result := config.DB.Model(&model.User{}).Where("id=?", id).Updates(updates)

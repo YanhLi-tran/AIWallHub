@@ -3,6 +3,7 @@ package handler
 import (
 	"AIWallHub/config"
 	"AIWallHub/internal/model"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -123,30 +124,42 @@ func Unfollow(c *gin.Context) {
 func GetFollowers(c *gin.Context) {
 	userID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "无效的用户ID",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户ID"})
 		return
 	}
 
-	rawCurrentUserID, _ := c.Get("current_user_id")
-	currentUserID, _ := rawCurrentUserID.(uint)
+	// 获取当前登录用户
+	rawCurrentUserID, exists := c.Get("current_user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "请先登录"})
+		return
+	}
+	currentUserID, ok := rawCurrentUserID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "用户ID类型错误"})
+		return
+	}
 
+	// 获取目标用户信息
 	var targetUser model.User
 	if err := config.DB.First(&targetUser, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "用户不存在",
-		})
+		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
 		return
 	}
 
+	// 调试输出
+	fmt.Println("=== GetFollowers 调试 ===")
+	fmt.Println("targetUserID:", userID)
+	fmt.Println("currentUserID:", currentUserID)
+	fmt.Println("targetUser.FollowVisible:", targetUser.FollowVisible)
+
+	// 隐私检查：如果不是查看自己，且对方设置了不公开
 	if currentUserID != uint(userID) && !targetUser.FollowVisible {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "该用户未公开关注/粉丝列表",
-		})
+		c.JSON(http.StatusForbidden, gin.H{"error": "该用户未公开关注/粉丝列表"})
 		return
 	}
 
+	// 查询粉丝列表
 	var follows []model.Follow
 	config.DB.Where("followee_id = ? AND status = 1", userID).Find(&follows)
 
@@ -172,27 +185,29 @@ func GetFollowers(c *gin.Context) {
 func GetFollowings(c *gin.Context) {
 	userID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "无效的用户ID",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户ID"})
 		return
 	}
 
-	rawCurrentUserID, _ := c.Get("current_user_id")
-	currentUserID, _ := rawCurrentUserID.(uint)
+	rawCurrentUserID, exists := c.Get("current_user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "请先登录"})
+		return
+	}
+	currentUserID, ok := rawCurrentUserID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "用户ID类型错误"})
+		return
+	}
 
 	var targetUser model.User
 	if err := config.DB.First(&targetUser, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "用户不存在",
-		})
+		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
 		return
 	}
 
 	if currentUserID != uint(userID) && !targetUser.FollowVisible {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "该用户未公开关注/粉丝列表",
-		})
+		c.JSON(http.StatusForbidden, gin.H{"error": "该用户未公开关注/粉丝列表"})
 		return
 	}
 
