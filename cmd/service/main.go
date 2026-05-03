@@ -33,6 +33,11 @@ func main() {
 	r.GET("/posts", handler.GetPosts)
 	r.GET("/post/:id", handler.GetPost)
 	r.GET("/post/:id/comments", handler.GetComments)
+	//搜索
+	r.GET("/search", handler.GlobalSearch)
+	r.GET("/search/users", handler.SearchUsers)
+	r.GET("/search/posts", handler.SearchPosts)
+
 
 	//需要登录的路由组
 	authorized := r.Group("/")
