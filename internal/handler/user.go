@@ -6,6 +6,8 @@ import (
 	"AIWallHub/pkg/cache"
 	"AIWallHub/pkg/crypto"
 	"AIWallHub/pkg/email"
+	"AIWallHub/pkg/validator"
+	"time"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -53,6 +55,47 @@ func SendVerifyCode(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "验证码已发送",
+	})
+}
+
+func UploadAvatar(c *gin.Context) {
+	rawUserID, exists := c.Get("current_user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "请先登录"})
+		return
+	}
+	userID, ok := rawUserID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "用户ID类型错误"})
+		return
+	}
+
+	file, err := c.FormFile("avatar")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请上传头像"})
+		return
+	}
+
+	ok, msg := validator.ValidateImage(file, "avatar")
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+		return
+	}
+
+	timestamp := time.Now().UnixNano()
+	filename := strconv.Itoa(int(userID)) + "_" + strconv.FormatInt(timestamp, 10) + "_" + file.Filename
+	savePath := "./uploads/" + filename
+	if err := c.SaveUploadedFile(file, savePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存头像失败"})
+		return
+	}
+
+	avatarURL := "/uploads/" + filename
+	config.DB.Model(&model.User{}).Where("id = ?", userID).Update("avatar", avatarURL)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "头像上传成功",
+		"avatar_url": avatarURL,
 	})
 }
 

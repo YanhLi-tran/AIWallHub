@@ -46,6 +46,7 @@ func main() {
 		authorized.PUT("/user/password", handler.UpdatePassword)  // 修改密码
 		authorized.PUT("/user/email", handler.UpdateEmail)        // 修改邮箱
 		authorized.DELETE("/user/account", handler.DeleteAccount) // 注销账号
+		authorized.POST("/user/avatar", handler.UploadAvatar)  // 上传头像
 
 		//动态管理
 		authorized.POST("/post", handler.CreatePost)
